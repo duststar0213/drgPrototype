@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whiteboard Challenge Assistant</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        /* Dark mode theme */
+        body {
+            background-color: #111111;
+            color: #f3f3f3;
+            font-family: Arial, sans-serif;
+        }
+
+        h1, h4, p {
+            color: #f3f3f3;
+        }
+
+        /* Chat bubble container */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: transparent;
+        }
+
+        /* User message bubble */
+        .user-message {
+            align-self: flex-end;
+            background-color: #d1f7c4; /* Light green */
+            color: #111111; /* Black text */
+            padding: 10px 15px;
+            border-radius: 15px 0px 15px 15px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+
+        /* AI message bubble */
+        .ai-message {
+            align-self: flex-start;
+            background-color: #add8e6; /* Light blue */
+            color: #111111; /* Black text */
+            padding: 10px 15px;
+            border-radius: 0px 15px 15px 15px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+
+#questions-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+   
+}
+#questions-title {
+    margin-bottom: 10px;
+    font-style: italic;
+    color: lightgrey;
+    text-align: left;
+    padding-top: 20px;
+}
+.question-button {
+    padding: 10px;
+    background-color: #222;
+    color: #f3f3f3;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    text-align: center;
+    font-style: italic;
+}
+
+.question-button:hover {
+    background-color: #63afee;
+    color: #111111;
+}
+
+#ideation-section {
+    text-align: center;
+    margin-top: 20px;
+}
+
+#ready-to-ideate {
+    padding: 10px;
+    background-color: #222;
+    color: #f3f3f3;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    text-align: center;
+    font-style: italic;
+}
+
+#ready-to-ideate:hover {
+    background-color: #f3f3f3;
+    color: #111111;
+}
+        /* Input area */
+        textarea {
+            display: block;
+    width: 100%;
+    padding: .375rem .75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #f3f3f3;
+    background-color: #222;
+    background-clip: padding-box;
+    border: var(--bs-border-width) solid var(--bs-border-color);
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: var(--bs-border-radius);
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    margin-top: 5%;
+        }
+
+        .btn{
+            padding: 10px;
+    background-color: #222;
+    color: #f3f3f3;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    text-align: center;
+    font-style: italic;
+            
+        }
+     /* Spinner (breathing dots) for AI response */
+     .breathing-dots {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 16px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    background-color: #fff;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+.dot:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.dot:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+@keyframes pulse {
+    0%, 80%, 100% {
+        opacity: 0;
+    }
+    40% {
+        opacity: 1;
+    }
+}
+.question-button:disabled {
+    opacity: 0.5;
+    pointer-events: none; /* Prevent clicking on disabled buttons */
+}
+.gradient_anim_btn {
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 12px;
+  padding: 14px 20px 14px 20px;
+  border-radius: 0.7em;
+  background: -webkit-linear-gradient(225deg, rgb(251, 175, 21), rgb(251, 21, 242), rgb(21, 198, 251)) 0% 0% / 300% 300%;
+  background-size: 200% auto;
+  -webkit-animation: gradient_move 3s ease infinite;
+  animation: gradient_move 3s ease infinite;
+}
+
+@-webkit-keyframes gradient_move {
+  0% { background-position: 0% 92%; }
+  50% { background-position: 100% 9%; }
+  100% { background-position: 0% 92%; }
+}
+
+@keyframes gradient_move {
+  0% { background-position: 0% 92%; }
+  50% { background-position: 100% 9%; }
+  100% { background-position: 0% 92%; }
+}
+    </style>
+</head>
+<body>
+<div class="container mt-5">
+    <h1>Whiteboard Challenge Assistant</h1>
+
+    <!-- Challenge Section -->
+    <div id="challenge-section">
+        <h4>Whiteboard Challenge:</h4>
+        <p id="challenge-text">{{ challenge_prompt if challenge_prompt else "Hello I am your whiteboard challenge assitstant who helps you be more familiar with UX Whiteboard Challenge. Click the button to begin!" }}</p>
+        <div class="text-center">
+            <button id="generate-challenge" class="btn mt-2">
+                {{ "Regenerate Challenge" if challenge_prompt else "Generate Challenge" }}
+            </button>
+        </div>
+    </div>
+
+
+    <!-- Conversation Section -->
+    <div class="chat-container" id="conversation">
+        {% for message in conversation %}
+        {% if not (message.role == 'assistant' and message.content.startswith('Challenge:')) %}
+            <div class="{{ 'user-message' if message.role == 'user' else 'ai-message' }}">
+                {{ message.content }}
+            </div>
+        {% endif %}
+    {% endfor %}
+        <!-- Placeholder for loading spinner
+        <div id="loading-spinner" class="ai-message" style="display: none;">
+            <span class="dots">Processing<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>
+        </div> -->
+    </div>
+    <!-- Leading Questions -->
+    {% if questions %}
+    <div id="questions-title" style="text-align: left; margin-bottom: 10px; font-style: italic; color: lightgrey;">
+        You may want to ask...
+    </div>
+    <div id="questions-section" class="questions-container">
+        {% for question in questions %}
+        <button class="question-button" onclick="submitQuestion('{{ question }}')">
+            {{ question }}
+        </button>
+        {% endfor %}
+    </div>
+    <div id="ideation-section" style="display: none;">
+           <div id="ideation-section" style="display: none;">
+        <button id="ready-to-ideate" class="question-button">I am ready to ideate</button>
+        <button id="more-questions" class="question-button">I have more questions</button>
+    </div>
+    </div>
+    
+    {% endif %}
+    <!-- Input Section -->
+    <div id="input-section">
+        <textarea id="user-input" class="textarea" rows="3" placeholder="Type your message here..."></textarea>
+        <button id="send-input" class="btn">Send</button>
+    </div>
+</div>
+
+<script>
+  
+$(document).ready(function () {
+    let isProcessing = false; // Flag to track if AI is processing
+
+    // Generate challenge
+    $("#generate-challenge").click(function () {
+        if (isProcessing) return; // Prevent further input
+        $.post("/generate-challenge", function (data) {
+            $("#challenge-text").text(data.challenge_prompt);
+            location.reload(); // Reload to show buttons or updated conversation
+        });
+    });
+
+    // Send user input
+    $("#send-input").click(function () {
+        if (isProcessing) return; // Prevent new input while processing
+
+        const userInput = $("#user-input").val();
+        if (userInput.trim() === "") return;
+
+        // Add user input (green bubble)
+        appendUserMessage(userInput);
+
+        // Append AI bubble with breathing dots
+        const aiBubble = appendAIBubbleWithDots();
+
+        // Scroll to the bottom
+        scrollToBottom();
+
+        // Disable input and buttons
+        toggleInputAndButtons(false);
+
+        // Send input to backend
+        $.post("/process", { user_input: userInput }, function (data) {
+            // Replace dots with typing effect
+            typeOutResponse(aiBubble, data.response, () => {
+                // Re-enable input and buttons AFTER typing completes
+                toggleInputAndButtons(true);
+
+if (data.ready_to_ideate) {
+    // Hide leading questions
+    $("#questions-section").hide();
+
+    // Show ideation buttons
+    $("#ideation-section").show();
+}else {
+            // Update leading questions dynamically
+            const questionsContainer = $("#questions-section");
+            questionsContainer.empty(); // Clear existing buttons
+            data.new_questions.forEach((question) => {
+                const button = $("<button>")
+                    .addClass("question-button")
+                    .text(question)
+                    .click(() => submitQuestion(question));
+                questionsContainer.append(button);
+            });
+        }
+                
+            });
+
+// Add this inside the `process` and `submitQuestion` success callbacks
+if (data.ready_to_ideate) {
+    // Hide the leading questions
+    document.getElementById("questions-section").style.display = "none";
+
+    // Show the new ideation buttons
+    const ideationSection = document.getElementById("ideation-section");
+    ideationSection.innerHTML = `
+        <button id="ready-to-ideate" class="btn">I am ready to ideate</button>
+        <button id="more-questions" class="btn">I have more questions</button>
+    `;
+    ideationSection.style.display = "block";
+
+    // Attach handlers for the new buttons
+    document.getElementById("ready-to-ideate").onclick = function () {
+        // Handle "I am ready to ideate"
+        alert("Let's move to ideation!");
+    };
+
+    document.getElementById("more-questions").onclick = function () {
+        // Handle "I have more questions"
+        alert("Feel free to ask more questions!");
+    };
+}
+            
+
+            $("#user-input").val(""); // Clear input field
+        }).fail(function () {
+            aiBubble.innerHTML = "An error occurred. Please try again.";
+            toggleInputAndButtons(true); // Re-enable input and buttons on failure
+        });
+    });
+
+    // Submit a leading question
+    window.submitQuestion = function (clickedQuestion) {
+        if (isProcessing) return; // Prevent new input while processing
+
+        // Add clicked question as a user message (green bubble)
+        appendUserMessage(clickedQuestion);
+
+        // Append AI bubble with breathing dots
+        const aiBubble = appendAIBubbleWithDots();
+
+        // Scroll to the bottom
+        scrollToBottom();
+
+        // Disable input and buttons
+        toggleInputAndButtons(false);
+        
+
+        // Send clicked question to backend
+        fetch("/process", {
+            method: "POST",
+            body: new URLSearchParams({ user_input: clickedQuestion }),
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                // Replace dots with typing effect
+                typeOutResponse(aiBubble, data.response, () => {
+                    // Re-enable input and buttons AFTER typing completes
+                    toggleInputAndButtons(true);
+                });
+                // Add this inside the `process` and `submitQuestion` success callbacks
+if (data.ready_to_ideate) {
+    // Hide the leading questions
+    document.getElementById("questions-section").style.display = "none";
+
+    // Show the new ideation buttons
+    const ideationSection = document.getElementById("ideation-section");
+    ideationSection.innerHTML = `
+        <button id="ready-to-ideate" class="btn">I am ready to ideate</button>
+        <button id="more-questions" class="btn">I have more questions</button>
+    `;
+    ideationSection.style.display = "block";
+
+    // Attach handlers for the new buttons
+    document.getElementById("ready-to-ideate").onclick = function () {
+        // Handle "I am ready to ideate"
+        alert("Let's move to ideation!");
+    };
+
+    document.getElementById("more-questions").onclick = function () {
+        // Handle "I have more questions"
+        alert("Feel free to ask more questions!");
+    };
+}
+
+                // Continue processing leading questions
+            return fetch("/process-question", {
+                    method: "POST",
+                    body: new URLSearchParams({ clicked_question: clickedQuestion }),
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                });
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.ready_to_ideate) {
+                    document.getElementById("questions-section").style.display = "none";
+                    document.getElementById("ideation-section").style.display = "block";
+                } else {
+                    // Update the leading questions
+                    updateLeadingQuestions(data.new_questions);
+                }
+            })
+            .catch((error) => {
+                console.error("Error:", error);
+                aiBubble.innerHTML = "An error occurred. Please try again.";
+                toggleInputAndButtons(true); // Re-enable input and buttons on failure
+            });
+    };
+
+    // Helper: Append a user message (green bubble)
+    function appendUserMessage(message) {
+        const userBubble = document.createElement("div");
+        userBubble.className = "user-message";
+        userBubble.textContent = message;
+        $("#conversation").append(userBubble);
+    }
+
+    // Helper: Append AI bubble with breathing dots
+    function appendAIBubbleWithDots() {
+        const aiBubble = document.createElement("div");
+        aiBubble.className = "ai-message";
+
+        const dotsContainer = document.createElement("div");
+        dotsContainer.className = "breathing-dots";
+        dotsContainer.innerHTML = `
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        `;
+        aiBubble.appendChild(dotsContainer);
+        $("#conversation").append(aiBubble);
+        return aiBubble;
+    }
+
+    // Helper: Typing effect function
+    function typeOutResponse(aiBubble, text, onComplete) {
+    const dotsContainer = aiBubble.querySelector(".breathing-dots");
+    if (dotsContainer) aiBubble.removeChild(dotsContainer);
+
+    const words = text.split(" "); // Split the text into an array of words
+    let index = 0;
+
+    const interval = setInterval(() => {
+        if (index < words.length) {
+            aiBubble.innerHTML += (index === 0 ? "" : " ") + words[index]; // Append word by word
+            index++;
+        } else {
+            clearInterval(interval); // Stop typing once the response is complete
+            if (onComplete) onComplete(); // Call onComplete callback if provided
+        }
+    }, 300); // Adjust typing speed for word delay
+}
+
+    // Helper: Scroll to the bottom of the chat container
+    function scrollToBottom() {
+        const chatContainer = document.getElementById("conversation");
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // Helper: Update leading questions dynamically
+    function updateLeadingQuestions(newQuestions) {
+        const questionsContainer = document.getElementById("questions-section");
+     // Ensure questionsContainer exists
+    if (!questionsContainer) {
+        console.error("questions-section not found in the DOM.");
+        return;
+    }
+    const PREDEFINED_QUESTIONS = [
+    "Help me understand the context",
+    "Who is the user?",
+    "What are the users' pain points?",
+    "Are there any restrictions or constraints to consider?"
+];
+    
+    if (newQuestions && Array.isArray(newQuestions) && newQuestions.length > 0) {
+        questionsContainer.innerHTML = ""; // Clear existing buttons
+        newQuestions.forEach((question) => {
+            const button = document.createElement("button");
+
+            // const isPredefined = PREDEFINED_QUESTIONS.includes(question);
+            button.className = "question-button"
+            button.innerText = question;
+            button.onclick = () => submitQuestion(question);
+            questionsContainer.appendChild(button);
+        });
+    } else{
+        console.warn("No new questions provided:", newQuestions);
+        questionsContainer.innerHTML = ""; // Clea
+    }
+    }
+
+    // Helper: Toggle input field and buttons
+    function toggleInputAndButtons(enable) {
+    const inputField = document.getElementById("user-input");
+    const sendButton = document.getElementById("send-input");
+    const questionButtons = document.getElementById("questions-section");
+    if (enable) {
+        inputField.disabled = false;
+        sendButton .style.opacity = 1.0;
+        questionButtons .style.display = "grid"; // Re-show buttons
+        sendButton.disabled = false;
+    } else {
+        inputField.disabled = true;
+        sendButton .style.opacity = 0.5;
+        questionButtons .style.display = "none"; // Hide buttons
+        sendButton.disabled = true;
+    }
+}
+// Handle ideation actions
+$("#ready-to-ideate").click(function () {
+    handleIdeationAction("ready_to_ideate");
+});
+
+$("#more-questions").click(function () {
+    handleIdeationAction("more_questions");
+});
+
+function handleIdeationAction(action) {
+    // Disable buttons during processing
+    toggleInputAndButtons(false);
+
+    // Send action to the backend
+    $.post("/process-ideation", { action: action }, function (data) {
+        // Display AI response in a blue bubble
+        const aiBubble = createAIBubbleWithDots();
+        $("#conversation").append(aiBubble);
+
+        // Typing effect for AI response
+        typeOutResponse(aiBubble, data.response, () => {
+            // Re-enable input and buttons
+            toggleInputAndButtons(true);
+
+            // Handle the UI based on action
+            if (action === "more_questions") {
+                // Show updated leading questions
+                const questionsContainer = $("#questions-section");
+                questionsContainer.empty(); // Clear existing buttons
+                data.updated_questions.forEach((question) => {
+                    const button = $("<button>")
+                        .addClass("question-button")
+                        .text(question)
+                        .click(() => submitQuestion(question));
+                    questionsContainer.append(button);
+                });
+                $("#questions-section").show();
+            } else if (action === "ready_to_ideate") {
+                // Hide question buttons for ideation phase
+                $("#questions-section").hide();
+                $("#ideation-section").hide();
+            }
+        });
+    }).fail(function () {
+        console.error("Error processing ideation action.");
+    });
+}
+
+  
+
+});</script>
+</body>
+</html>

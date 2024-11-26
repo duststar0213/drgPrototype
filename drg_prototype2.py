@@ -158,6 +158,7 @@ def get_ai_response(user_input, prompt=None):
          "You should remeber what they have asked because later when you are giving feedback on how well they did for this challenge, you can reflect how they are process and taclke through what questions they have asked"
          "keep your answer less than 5 sentences"
          "dont throw jargons"
+         
          }
     ]
     if prompt:
@@ -195,10 +196,11 @@ def generate_challenge():
         prompt_generation_instruction = (
             "You are acting like a senior UX or product design manager giving a whiteboard challenge to your interviewees. "
             "The challenge can be an app, a service, or any platform"
-            "The challenge is about users in real life"
-            "The challenge should be something reltively common seen and cutting-edge"
+            "The challenge is about users needs in real life"
+            "The challenge should be something reltively commonly seen"
             "The challenge prompt should be chosen from varied topics but avoid technical jargons"
             "The challenge prompt should not limited to certain platform"
+            "The challenge should be feasible and the interviewee should be able to finish the process in 30 minutes"
             "Keep your prompt in 3-5sentences and one paragraph"
         )
         response = openai.ChatCompletion.create(
@@ -307,7 +309,17 @@ def handle_user_input():
             # Generate TTS and play audio
             st.session_state["audio_base64"] = generate_audio(ai_response)
             play_audio(st.session_state["audio_base64"])
-        # Clear the input field
+        user_input, uploaded_file = render_sketch_upload_ui()
+
+        # Handle file upload
+        if uploaded_file is not None:
+            # Load and display the uploaded file
+            image = Image.open(uploaded_file)
+            st.image(image, caption="Uploaded Image", use_column_width=True)
+            st.write("You uploaded a file!")
+        elif user_input:
+            st.write(f"You entered: {user_input}")
+            # Clear the input field
         st.session_state["user_input"] = ""  # Reset the input field in session state
 
 # Function to analyze uploaded image and provide feedback
@@ -365,22 +377,82 @@ def handle_sketch_upload():
         st.markdown(f"**AI Feedback:** {feedback}")
         
 def render_sketch_upload_ui():
+
     """
-    Render the drag-and-drop file upload UI for the sketch.
+    Render a unified input field for both text input and drag-and-drop file upload.
     """
+    # Custom CSS for styling the combined input field
     st.markdown(
         """
-        <div class="file-upload-container">
-            <form>
-                <label for="file-upload">Drag and drop your sketch here, or click to browse.</label>
-                <input type="file" id="file-upload" accept="image/png, image/jpeg">
-            </form>
-            <div class="add-icon">+</div>
-        </div>
+        <style>
+        .combined-input-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+            text-align: center;
+            transition: background-color 0.3s ease;
+        }
+        .combined-input-container:hover {
+            background-color: #f1f1f1;
+        }
+        .combined-input-container input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .combined-text-input {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            padding: 10px;
+            font-size: 1rem;
+            margin-top: 10px;
+        }
+        .add-icon {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #0073e6;
+            color: #fff;
+            font-size: 18px;
+            line-height: 30px;
+            text-align: center;
+            cursor: pointer;
+        }
+        </style>
         """,
         unsafe_allow_html=True,
     )
-    return st.file_uploader("Upload your sketch", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
+
+    # Create a container for the combined input
+    file_input = st.file_uploader(
+        label="",
+        type=["png", "jpg", "jpeg"],
+        key="file_uploader_combined",
+        label_visibility="collapsed",
+    )
+
+    # Create a text input box for the same field
+    user_input = st.text_input(
+        "Type your message here or upload a file...",
+        key="combined_text_input",
+        placeholder="Type your message or drag/drop a file here...",
+    )
+
+    return user_input, file_input
 # Initialize session state
 if "conversation" not in st.session_state:
     st.session_state["conversation"] = []
@@ -568,11 +640,11 @@ def handle_start_ideating():
     st.session_state["conversation"].append({
         "role": "assistant",
         "content": (
-            "Great! Let’s brainstorm. Here’s a simple template to guide you:\n\n"
+            "Great! Let’s brainstorm. Here’s a simple template that may help guide you:\n\n"
             "**1. Goals**: What do you aim to achieve?\n"
-            "**2. Users**: Who are the target users? What are their characteristics?\n"
+            "**2. Users**: Who are the primary target users?\n"
             "**3. Pain Points**: What problems are you solving for the users?\n\n"
-            "Take your time to fill these out based on what we’ve discussed."
+            "Take your time to fill these out based on what we’ve discussed. You can follow "
         )
     })
     # Disable the ideation buttons

@@ -5,29 +5,32 @@ import os
 import numpy as np
 from gtts import gTTS
 from sklearn.metrics.pairwise import cosine_similarity
-import time
-import random
-import logging
+from PIL import Image
+from werkzeug.utils import secure_filename
+import base64
 
 # Initialize Flask app
 app = Flask(__name__)
 
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 # Set your OpenAI API key from environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
+# Ensure the upload directory exists
 
 # Predefined questions and keys
 PREDEFINED_QUESTIONS = [
-    "Help me understand the context",
+    "Is there any current solution?",
     "Who is the user?",
     "What are the users pain points?",
-    "Are there any restrictions or constraints to consider?"
+    "Are there any restrictions or constraints to consider?",
 ]
 
 QUESTION_KEYS = {
-    "context_question": "Help me understand the context",
+    "context_question": "Is there any current solution?",
     "user_question": "Who is the user?",
     "problem_question": "What are the users pain points?",
-    "constraints_question": "Are there any restrictions or constraints to consider?"
+    "constraints_question": "Are there any restrictions or constraints to consider?",
 }
 # Reference phrases for readiness
 READINESS_PHRASES = [
@@ -38,7 +41,7 @@ READINESS_PHRASES = [
     "I want to begin designing",
     "Let's start the next phase",
     "I have enough information",
-    "This is enough for me"
+    "This is enough for me",
 ]
 # State tracking
 conversation = []
@@ -48,12 +51,11 @@ ready_for_questions = False
 
 # Initialize leading_questions globally
 # Initialize leading_questions globally
-leading_questions = [
-    {"question": q, "answered": False} for q in PREDEFINED_QUESTIONS
-]
+leading_questions = [{"question": q, "answered": False} for q in PREDEFINED_QUESTIONS]
 
 
 # Fun
+
 
 # Generate audio from text
 def generate_audio(text):
@@ -62,32 +64,34 @@ def generate_audio(text):
     tts.save(audio_filename)
     return audio_filename
 
+
 # Function to fetch AI response
 def get_ai_response(user_input, prompt=None):
     """Get AI response based on user input and optional prompt."""
     messages = [
-        {"role": "system", "content": (
-            "You are now acting as a senior UX or product design manager giving whiteboard design challenges. "
-            "Your user is a design student who might be new to whiteboard challenges. "
-            f"The challenge is: '{prompt if prompt else 'No specific challenge provided.'}'. "
-            "Your main goal is to help the user clarify their understanding of the challenge and approach it methodically. "
-            "Always encourage them to use the predefined questions to explore the challenge further. "
-            f"The predefined questions currently are: {leading_questions}. "
-            "If the user seems stuck or provides general input, redirect them to interact with the predefined buttons for guidance. "
-            "Keep your response short (less than 3 sentences) but motivational and supportive while encouraging exploration."
-        )}
+        {
+            "role": "system",
+            "content": (
+                "You are now acting as a senior UX or product design manager giving whiteboard design challenges. "
+                "Your user is a design student who might be new to whiteboard challenges. "
+                f"The challenge is: '{prompt if prompt else 'No specific challenge provided.'}'. "
+                "Your main goal is to help the user clarify their understanding of the challenge and approach it methodically. "
+                "Always encourage them to use the predefined questions to explore the challenge further. "
+                f"The predefined questions currently are: {leading_questions}. "
+                "If the user seems stuck or provides general input, redirect them to interact with the predefined buttons for guidance. "
+                "Keep your response short (less than 3 sentences) but motivational and supportive while encouraging exploration."
+            ),
+        }
     ]
-    
+
     messages.append({"role": "user", "content": user_input})
 
     response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=messages,
-        temperature=0.7,
-        max_tokens=4096
+        model="gpt-4", messages=messages, temperature=0.7, max_tokens=4096
     )
 
     return response["choices"][0]["message"]["content"]
+
 
 # Function to generate a challenge
 def generate_challenge():
@@ -103,17 +107,16 @@ def generate_challenge():
         model="gpt-4",
         messages=[{"role": "system", "content": prompt_generation_instruction}],
         temperature=0.8,
-        max_tokens=256
+        max_tokens=256,
     )
     return response["choices"][0]["message"]["content"]
 
+
 # Fetch embeddings for semantic similarity
 def get_embeddings(text):
-    response = openai.Embedding.create(
-        input=[text],
-        model="text-embedding-ada-002"
-    )
-    return np.array(response['data'][0]['embedding'])
+    response = openai.Embedding.create(input=[text], model="text-embedding-ada-002")
+    return np.array(response["data"][0]["embedding"])
+
 
 # Check if a question is semantically similar to a previous one
 def is_similar_to_previous_questions(new_question, previous_questions, threshold=0.85):
@@ -123,6 +126,8 @@ def is_similar_to_previous_questions(new_question, previous_questions, threshold
     previous_embeddings = [get_embeddings(q) for q in previous_questions]
     similarities = cosine_similarity([new_embedding], previous_embeddings)[0]
     return max(similarities) >= threshold
+
+
 # Function to generate a new leading question
 def generate_new_question(excluded_questions, answered_questions):
     prompt = (
@@ -137,11 +142,13 @@ def generate_new_question(excluded_questions, answered_questions):
         model="gpt-4",
         messages=[{"role": "system", "content": prompt}],
         temperature=0.7,
-        max_tokens=100,
+        max_tokens=1024,
     )
     new_question = response["choices"][0]["message"]["content"]
     print(f"New question from AI: {new_question}")  # Debug log
     return new_question
+
+
 def check_adequate_information(conversation):
     """
     Check if the conversation semantically covers user, pain points, and goal topics.
@@ -150,9 +157,24 @@ def check_adequate_information(conversation):
 
     # Reference phrases for semantic similarity
     reference_phrases = {
-        "user": ["Who are the users?", "Define the audience", "Who will use this?", "Target customer"],
-        "pain_points": ["What problems are being solved?", "Pain points", "Challenges", "User difficulties"],
-        "goal": ["What is the goal?", "Purpose of the design", "Objective", "Design aim"]
+        "user": [
+            "Who are the users?",
+            "Define the audience",
+            "Who will use this?",
+            "Target customer",
+        ],
+        "pain_points": [
+            "What problems are being solved?",
+            "Pain points",
+            "Challenges",
+            "User difficulties",
+        ],
+        "goal": [
+            "What is the goal?",
+            "Purpose of the design",
+            "Objective",
+            "Design aim",
+        ],
     }
 
     for msg in conversation:
@@ -167,7 +189,7 @@ def check_adequate_information(conversation):
     return all(covered.values())  # Return True if all topics are covered
 
 
-def is_similar_to_any(text, reference_phrases, threshold=0.85):
+def is_similar_to_any(text, reference_phrases, threshold=0.88):
     """
     Check if a given text is semantically similar to any reference phrases.
     Uses cosine similarity for comparison.
@@ -175,7 +197,12 @@ def is_similar_to_any(text, reference_phrases, threshold=0.85):
     text_embedding = get_embeddings(text)
     reference_embeddings = [get_embeddings(phrase) for phrase in reference_phrases]
     similarities = cosine_similarity([text_embedding], reference_embeddings)[0]
+    # Debug log for similarity scores
+    for phrase, similarity in zip(reference_phrases, similarities):
+        print(f"Comparing '{text}' with '{phrase}': Similarity = {similarity}")
     return any(similarity >= threshold for similarity in similarities)
+
+
 def has_meaningful_interaction(conversation):
     """
     Check if the user has engaged in meaningful interaction with the challenge.
@@ -184,23 +211,78 @@ def has_meaningful_interaction(conversation):
     for msg in conversation:
         if msg["role"] == "user":
             # Check if the user's message is a question or resembles a predefined question
-            if "?" in msg["content"] or is_similar_to_any(msg["content"], PREDEFINED_QUESTIONS):
+            if "?" in msg["content"] or is_similar_to_any(
+                msg["content"], PREDEFINED_QUESTIONS
+            ):
                 return True  # Found meaningful interaction
     return False
+
+
+def allowed_file(filename):
+    """Check if the file has an allowed extension."""
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def analyze_image(image_path, prompt):
+    """
+    Generate AI feedback based on the uploaded image and challenge prompt using GPT-4o.
+    """
+    with open(image_path, "rb") as image_file:
+        image_data = image_file.read()
+
+    # Prepare the image as part of the message
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"You are a senior UX or product design manager reviewing a student's design submission. "
+                f"The challenge is: '{prompt if prompt else 'No specific challenge provided.'}'. "
+                "Assess whether the submission effectively addresses the challenge, the logic of the design, "
+                "its clarity, and its potential effectiveness in solving the user's needs. "
+                "The uploaded image contains the user's submission."
+            ),
+        },
+        {
+            "role": "user",
+            "content": {
+                "type": "image_url",
+                "image_url": {
+                    "url": "data:image/png;base64,"
+                    + base64.b64encode(image_data).decode("utf-8")
+                },
+            },
+        },
+    ]
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4o",
+        messages=messages,
+        temperature=0.6,  # Lower temperature for precise feedback
+        max_tokens=512,
+    )
+
+    return response["choices"][0]["message"]["content"]
+
+
 # Routes
 @app.route("/")
 def index():
     global challenge_prompt, leading_questions
     # Filter unanswered questions to send to the frontend
     predefined_questions = [q["question"] for q in leading_questions]
-    unanswered_questions = [q["question"] for q in leading_questions if not q["answered"]]if challenge_prompt else []
+    unanswered_questions = (
+        [q["question"] for q in leading_questions if not q["answered"]]
+        if challenge_prompt
+        else []
+    )
     return render_template(
         "index.html",
         conversation=conversation,
         questions=unanswered_questions,
         challenge_prompt=challenge_prompt,
-        predefined_questions=predefined_questions
+        predefined_questions=predefined_questions,
     )
+
 
 @app.route("/generate-challenge", methods=["POST"])
 def generate_challenge_route():
@@ -209,48 +291,52 @@ def generate_challenge_route():
     challenge_prompt = generate_challenge()
     ready_for_questions = True
     answered_questions.clear()  # Reset answered questions
-    conversation.append({"role": "assistant", "content": f"Challenge: {challenge_prompt}"})
+    conversation.append(
+        {"role": "assistant", "content": f"Challenge: {challenge_prompt}"}
+    )
     return jsonify({"challenge_prompt": challenge_prompt})
+
 
 @app.route("/process", methods=["POST"])
 def process_input():
     global answered_questions, challenge_prompt, leading_questions
     user_input = request.form.get("user_input")
     response = ""
-    
-       # Check if the user input is similar to readiness phrases
+    # Check if the user input is similar to readiness phrases
     if is_similar_to_any(user_input, READINESS_PHRASES):
         # Generate AI response for ideation phase
-         # Check if the user has engaged with leading questions
+        # Check if the user has engaged with leading questions
         if not has_meaningful_interaction(conversation):
             # Generate a dynamic response using the AI
             prompt = (
-        "The user has expressed readiness to proceed without engaging with any of the clarifying questions. "
-        "Generate a polite and encouraging response that motivates the user to use the predefined clarifying questions "
-        "displayed on the interface or to type their own clarifying questions in the input field. "
-        "Emphasize the importance of asking clarifying questions in real-life design challenges, as it helps "
-        "narrow down the scope and demonstrates a thoughtful, structured approach. "
-        "Keep the tone friendly, motivational, and focused on the value of effective clarification."
+                "The user has expressed readiness to proceed without engaging with any of the clarifying questions. "
+                "Generate a polite and encouraging response that motivates the user to use the predefined clarifying questions "
+                "displayed on the interface or to type their own clarifying questions in the input field. "
+                "Emphasize the importance of asking clarifying questions in real-life design challenges, as it helps "
+                "narrow down the scope and demonstrates a thoughtful, structured approach. "
+                "Keep the tone friendly, motivational, and focused on the value of effective clarification."
             )
             response = get_ai_response(prompt)
-            return jsonify({
-                "response": response,
-                "show_leading_questions": True,
-                "hide_ideation_buttons": True,
-                "new_questions": [q["question"] for q in leading_questions if not q["answered"]]
-                
-            })
+            return jsonify(
+                {
+                    "response": response,
+                    "show_leading_questions": True,
+                    "hide_ideation_buttons": True,
+                    "new_questions": [
+                        q["question"] for q in leading_questions if not q["answered"]
+                    ],
+                }
+            )
         else:
-
             response = (
-            "Great! Let's summarize the key points you've gathered so far:<br><br>"
-            "<ul>"
-            "  <li><strong>Users:</strong>&nbsp;[Who are the users?]</li>"
-            "  <li><strong>Goals:</strong>&nbsp;[What is the primary goal?]</li>"
-            "  <li><strong>Pain Points:</strong>&nbsp;[What problems are being solved?]</li>"
-            "</ul><br>"
-            "Take a moment to fill in these details based on your understanding, "
-            "and then we can start building the user flow!"
+                "Great! Let's summarize the key points you've gathered so far:<br><br>"
+                "<ul>"
+                "  <li><strong>Users:</strong>&nbsp;[Who are the users?]</li>"
+                "  <li><strong>Goals:</strong>&nbsp;[What is the primary goal?]</li>"
+                "  <li><strong>Pain Points:</strong>&nbsp;[What problems are being solved?]</li>"
+                "</ul><br>"
+                "Take a moment to fill in these details based on your understanding, "
+                "and then we can start building the user flow!"
             )
             # Hide leading questions and enable ideation
             return jsonify({"response": response, "ready_to_ideate": True})
@@ -260,21 +346,30 @@ def process_input():
     if is_similar_to_any(user_input, current_questions):
         # Find the similar question
         for i, question in enumerate(leading_questions):
-            if not question["answered"] and is_similar_to_previous_questions(user_input, [question["question"]]):
+            if not question["answered"] and is_similar_to_previous_questions(
+                user_input, [question["question"]]
+            ):
                 question["answered"] = True  # Mark the similar question as answered
                 answered_questions.add(question["question"])  # Track it as answered
 
                 # Generate a new question to replace it
                 excluded_questions = [q["question"] for q in leading_questions]
-                new_question = generate_new_question(excluded_questions, list(answered_questions))
+                new_question = generate_new_question(
+                    excluded_questions, list(answered_questions)
+                )
                 leading_questions[i] = {"question": new_question, "answered": False}
 
-                print(f"Replaced similar question '{question['question']}' with '{new_question}'")
+                print(
+                    f"Replaced similar question '{question['question']}' with '{new_question}'"
+                )
                 break
+    # Check if the user input is the similar to any answered questions
 
     # Handle predefined questions
     if user_input in PREDEFINED_QUESTIONS:
-        question_key = list(QUESTION_KEYS.keys())[PREDEFINED_QUESTIONS.index(user_input)]
+        question_key = list(QUESTION_KEYS.keys())[
+            PREDEFINED_QUESTIONS.index(user_input)
+        ]
         if question_key not in answered_questions:
             answered_questions.add(question_key)
             response = get_ai_response(user_input, challenge_prompt)
@@ -292,19 +387,30 @@ def process_input():
     # Check if adequate information has been provided
     if check_adequate_information(conversation):
         # AI suggests moving forward
-        response += " I think you have obtained enough information. What about moving forward?"
-        return jsonify({
-            "response": response,
-            "ready_to_ideate": True,
-            "new_questions": [q["question"] for q in leading_questions if not q["answered"]]
-        })
+        response += (
+            " I think you have obtained enough information. What about moving forward?"
+        )
+        return jsonify(
+            {
+                "response": response,
+                "ready_to_ideate": True,
+                "new_questions": [
+                    q["question"] for q in leading_questions if not q["answered"]
+                ],
+            }
+        )
 
-    return jsonify({
-        "response": response,
-        "ready_to_ideate": False,
-        "new_questions": [q["question"] for q in leading_questions if not q["answered"]]
-        
-    })
+    return jsonify(
+        {
+            "response": response,
+            "ready_to_ideate": False,
+            "new_questions": [
+                q["question"] for q in leading_questions if not q["answered"]
+            ],
+        }
+    )
+
+
 @app.route("/process-question", methods=["POST"])
 def process_question():
     global leading_questions, answered_questions
@@ -342,6 +448,8 @@ def process_question():
     updated_questions = [q["question"] for q in leading_questions if not q["answered"]]
     print(f"Updated leading questions: {updated_questions}")
     return jsonify({"new_questions": updated_questions})
+
+
 @app.route("/process-ideation", methods=["POST"])
 def process_ideation():
     action = request.form.get("action")  # Get the action from the frontend
@@ -350,14 +458,13 @@ def process_ideation():
     if action == "ready_to_ideate":
         # Generate the ideation summary prompt
         response = (
-        "Great! Let's summarize the key points you've gathered so far:<br><br>"
-        "<ul>"
-        "  <li><strong>Users:</strong> Who are the users?</li>"
-        "  <li><strong>Goals:</strong> What is the primary goal?</li>"
-        "  <li><strong>Pain Points:</strong> What problems are being solved?</li></ul>"
-     
-        "<br>Take a moment to fill in these details based on your understanding, "
-        "and then we can start building the user flow!"
+            "Great! Let's summarize the key points you've gathered so far:<br><br>"
+            "<ul>"
+            "  <li><strong>Users:</strong> Who are the users?</li>"
+            "  <li><strong>Goals:</strong> What is the primary goal?</li>"
+            "  <li><strong>Pain Points:</strong> What problems are being solved?</li></ul>"
+            "<br>Take a moment to fill in these details based on your understanding, "
+            "and then we can start building the user flow!"
         )
     elif action == "more_questions":
         # Generate the response encouraging the user to save time for ideation
@@ -370,11 +477,49 @@ def process_ideation():
     # Return the new response and updated leading questions
     updated_questions = [q["question"] for q in leading_questions if not q["answered"]]
     return jsonify({"response": response, "updated_questions": updated_questions})
+
+
 @app.route("/audio", methods=["POST"])
 def generate_audio_response():
     response_text = request.form.get("response_text")
     audio_file = generate_audio(response_text)
     return jsonify({"audio_file": audio_file})
+
+
+@app.route("/upload-file", methods=["POST"])
+def upload_file():
+    global challenge_prompt
+
+    # Check if a file part is in the request
+    if "file" not in request.files:
+        return jsonify(error="No file part"), 400
+
+    file = request.files["file"]
+
+    # Check if a file was selected
+    if file.filename == "":
+        return jsonify(error="No selected file"), 400
+
+    # Validate the file type
+    if file and allowed_file(file.filename):
+        try:
+            # Read file data into memory
+            file_data = file.read()
+
+            # Encode file data to Base64
+            image_base64 = base64.b64encode(file_data).decode("utf-8")
+
+            # Use the encoded image for analysis
+            feedback = analyze_image(image_base64, challenge_prompt)
+
+            return jsonify(feedback=feedback)
+        except Exception as e:
+            return jsonify(
+                error=f"An error occurred while processing the file: {str(e)}"
+            ), 500
+
+    return jsonify(error="Invalid file type"), 400
+
 
 if __name__ == "__main__":
     app.run(debug=True)
